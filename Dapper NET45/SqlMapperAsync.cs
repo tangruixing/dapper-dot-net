@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -107,11 +108,22 @@ namespace Dapper
                     if (command.Buffered)
                     {
                         List<T> buffer = new List<T>();
+                        var convertToType = Nullable.GetUnderlyingType(effectiveType) ?? effectiveType;
                         while (await reader.ReadAsync(cancel).ConfigureAwait(false))
                         {
-                            buffer.Add((T)func(reader));
+                            object val = func(reader);
+                            if (val == null || val is T)
+                            {
+                                buffer.Add((T) val);
+                            }
+                            else
+                            {
+                                buffer.Add((T)Convert.ChangeType(val, convertToType, CultureInfo.InvariantCulture));
+                            }
+
+                           
                         }
-                        while (await reader.NextResultAsync().ConfigureAwait(false)) { }
+                        while (await reader.NextResultAsync(cancel).ConfigureAwait(false)) { }
                         command.OnCompleted();
                         return buffer;
                     }
